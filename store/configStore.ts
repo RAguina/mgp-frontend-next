@@ -11,10 +11,13 @@ interface ConfigStore {
   maxTokens: number;
   mockMode: boolean;
   
-  // ✅ NUEVO: Tipo de ejecución
-  executionType: 'simple' | 'orchestrator';
+  // Tipo de ejecución (expandido para incluir 'challenge')
+  executionType: 'simple' | 'orchestrator' | 'challenge';
   
-  // ✅ NUEVO: Configuración del orchestrator
+  // ✅ NUEVO: ID del flujo seleccionado
+  selectedFlowId: string;
+  
+  // Configuración del orchestrator
   orchestrator: {
     agents: string[];
     tools: string[];
@@ -30,8 +33,11 @@ interface ConfigStore {
   setMaxTokens: (tokens: number) => void;
   toggleMockMode: () => void;
   
-  // ✅ NUEVO: Actions para orchestrator
-  setExecutionType: (type: 'simple' | 'orchestrator') => void;
+  // Actions para tipo de ejecución y flujo
+  setExecutionType: (type: 'simple' | 'orchestrator' | 'challenge') => void;
+  setSelectedFlowId: (flowId: string) => void; // ✅ NUEVO
+  
+  // Actions para orchestrator
   setOrchestratorAgents: (agents: string[]) => void;
   setOrchestratorTools: (tools: string[]) => void;
   setOrchestratorVerbose: (verbose: boolean) => void;
@@ -49,8 +55,11 @@ export const useConfigStore = create<ConfigStore>()(
       maxTokens: 512,
       mockMode: true,
       
-      // ✅ NUEVO: Estado inicial para orchestrator
+      // Estado inicial para tipo de ejecución
       executionType: 'simple',
+      selectedFlowId: 'simple', // ✅ NUEVO: flujo seleccionado por defecto
+      
+      // Estado inicial para orchestrator
       orchestrator: {
         agents: ['research_agent', 'knowledge_agent'],
         tools: ['web_search', 'wikipedia'],
@@ -66,8 +75,11 @@ export const useConfigStore = create<ConfigStore>()(
       setMaxTokens: (tokens) => set({ maxTokens: tokens }),
       toggleMockMode: () => set((state) => ({ mockMode: !state.mockMode })),
       
-      // ✅ NUEVO: Actions para orchestrator
+      // Actions para tipo de ejecución y flujo
       setExecutionType: (executionType) => set({ executionType }),
+      setSelectedFlowId: (selectedFlowId) => set({ selectedFlowId }), // ✅ NUEVO
+      
+      // Actions para orchestrator
       setOrchestratorAgents: (agents) => 
         set((state) => ({ 
           orchestrator: { ...state.orchestrator, agents } 

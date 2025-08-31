@@ -1,0 +1,1474 @@
+// components/OutputDisplay.tsx - Componente para mostrar el output
+
+'use client';
+
+import React from 'react';
+import { Copy, CheckCircle, Code } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+/**
+ * Props para el componente OutputDisplay
+ */
+interface OutputDisplayProps {
+  /** Output a mostrar */
+  output: string;
+  /** Si está cargando */
+  isLoading?: boolean;
+  /** Clases CSS adicionales */
+  className?: string;
+}
+
+/**
+ * Componente para mostrar el output generado
+ * @param props - Props del componente
+ */
+export const OutputDisplay: React.FC<OutputDisplayProps> = ({
+  output,
+  isLoading = false,
+  className,
+}) => {
+  const [copied, setCopied] = React.useState(false);
+
+  /**
+   * Copia el output al portapapeles
+   */
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(output);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className={cn("bg-white rounded-lg shadow-lg", className)}>
+      <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Code className="w-5 h-5 text-gray-600" />
+          <h3 className="font-semibold text-gray-900">Output Generado</h3>
+        </div>
+        {output && (
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            {copied ? (
+              <>
+                <CheckCircle className="w-4 h-4" />
+                Copiado
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4" />
+                Copiar
+              </>
+            )}
+          </button>
+        )}
+      </div>
+      
+      <div className="p-6">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="space-y-3 text-center">
+              <div className="animate-pulse flex space-x-4">
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              </div>
+              <div className="animate-pulse flex space-x-4">
+                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+              </div>
+              <div className="animate-pulse flex space-x-4">
+                <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+              </div>
+            </div>
+          </div>
+        ) : output ? (
+          <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded-lg overflow-x-auto">
+            {output}
+          </pre>
+        ) : (
+          <p className="text-gray-400 text-center py-12">
+            El output aparecerá aquí después de la ejecución
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};// components/flow/FlowVisualizer.tsx - Visualizador interactivo del flujo de LangGraph
+
+'use client';
+
+import React, { useCallback, useEffect, useState } from 'react';
+/* import ReactFlow, {
+  Node,
+  Edge,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  Handle,
+  Position,
+  NodeProps,
+  BackgroundVariant,
+} from 'reactflow'; */
+ import ReactFlow, {
+  Node,
+  Edge,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  Handle,
+  Position,
+  NodeProps,
+  BackgroundVariant,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import { NodeState, EdgeState, FlowState } from '@/lib/types';
+import { getNodeColor } from '@/lib/utils';
+import { Clock, Cpu, Zap, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+
+/**
+ * Props para el componente CustomNode
+ */
+interface CustomNodeData {
+  nodeState: NodeState;
+  onNodeClick: (nodeId: string) => void;
+  model?: string;
+  executionTime?: number;
+  decision?: string;
+}
+
+
+/**
+ * Componente personalizado para renderizar cada nodo del flujo
+ * @param props - Props del nodo incluyendo data con información del estado
+ */
+const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data }) => {
+  const { nodeState, onNodeClick } = data;
+  const color = getNodeColor(nodeState.status);
+  
+  const statusIcons = {
+    pending: <AlertCircle className="w-4 h-4" />,
+    running: <Zap className="w-4 h-4 animate-pulse" />,
+    completed: <CheckCircle className="w-4 h-4" />,
+    failed: <XCircle className="w-4 h-4" />,
+    skipped: <AlertCircle className="w-4 h-4" />,
+  };
+
+  return (
+    <div
+      className="px-4 py-3 rounded-lg border-2 bg-white shadow-lg cursor-pointer transition-all hover:shadow-xl"
+      style={{ borderColor: color }}
+      onClick={() => onNodeClick(nodeState.id)}
+    >
+      <Handle type="target" position={Position.Top} />
+      
+      <div className="flex items-center gap-2 mb-2">
+        <div style={{ color }}>{statusIcons[nodeState.status]}</div>
+        <div className="font-semibold text-sm">{nodeState.label}</div>
+      </div>
+      
+      {nodeState.data && (
+        <div className="text-xs text-gray-600 space-y-1">
+          {nodeState.data.model && (
+            <div className="flex items-center gap-1">
+              <Cpu className="w-3 h-3" />
+              <span>{nodeState.data.model}</span>
+            </div>
+          )}
+          {nodeState.data.executionTime && (
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>{nodeState.data.executionTime}ms</span>
+            </div>
+          )}
+          {nodeState.data.decision && (
+            <div className="italic">{nodeState.data.decision}</div>
+          )}
+        </div>
+      )}
+      
+      <Handle type="source" position={Position.Bottom} />
+    </div>
+  );
+};
+
+const nodeTypes = {
+  custom: CustomNode,
+};
+
+/**
+ * Props para el componente FlowVisualizer
+ */
+interface FlowVisualizerProps {
+  /** Estado del flujo a visualizar */
+  flowState: FlowState;
+  /** Callback cuando se hace click en un nodo */
+  onNodeClick?: (nodeId: string) => void;
+  /** Si el flujo está actualmente ejecutándose */
+  isExecuting?: boolean;
+}
+
+/**
+ * Componente principal para visualizar el flujo de ejecución de LangGraph
+ * @param props - Props del componente
+ */
+export const FlowVisualizer: React.FC<FlowVisualizerProps> = ({
+  flowState,
+  onNodeClick = () => {},
+  isExecuting = false,
+}) => {
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+
+  /**
+   * Convierte el estado del flujo a nodos de ReactFlow
+   */
+  const convertToReactFlowNodes = useCallback((nodeStates: NodeState[]): Node[] => {
+    const nodeWidth = 200;
+    const nodeHeight = 100;
+    const horizontalSpacing = 250;
+    const verticalSpacing = 150;
+
+    // Organizar nodos en niveles
+    const levels: { [key: string]: number } = {
+      'task_analyzer': 0,
+      'resource_monitor': 1,
+      'execution': 2,
+      'validator': 3,
+      'history_reader': 4,
+      'summary': 5,
+    };
+
+    return nodeStates.map((nodeState, index) => {
+      const level = levels[nodeState.type] ?? index;
+      const nodesInLevel = nodeStates.filter(n => levels[n.type] === level).length;
+      const indexInLevel = nodeStates.filter(n => levels[n.type] === level).indexOf(nodeState);
+      
+      return {
+        id: nodeState.id,
+        type: 'custom',
+        position: {
+          x: (indexInLevel - (nodesInLevel - 1) / 2) * horizontalSpacing + 400,
+          y: level * verticalSpacing + 50,
+        },
+        data: {
+          nodeState,
+          onNodeClick: handleNodeClick,
+          ...nodeState.data,
+        },
+      };
+    });
+  }, []);
+
+  /**
+   * Convierte el estado del flujo a edges de ReactFlow
+   */
+  const convertToReactFlowEdges = useCallback((edgeStates: EdgeState[]): Edge[] => {
+    return edgeStates.map(edge => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      label: edge.label,
+      animated: edge.animated || (isExecuting && edge.target === flowState.currentNode),
+      style: edge.style || {
+        stroke: '#6b7280',
+        strokeWidth: 2,
+      },
+    }));
+  }, [isExecuting, flowState.currentNode]);
+
+  /**
+   * Maneja el click en un nodo
+   */
+  const handleNodeClick = useCallback((nodeId: string) => {
+    setSelectedNode(nodeId);
+    onNodeClick(nodeId);
+  }, [onNodeClick]);
+
+  // Actualizar nodos y edges cuando cambia el estado del flujo
+  useEffect(() => {
+    setNodes(convertToReactFlowNodes(flowState.nodes));
+    setEdges(convertToReactFlowEdges(flowState.edges));
+  }, [flowState, convertToReactFlowNodes, convertToReactFlowEdges, setNodes, setEdges]);
+
+  return (
+    <div className="w-full h-full relative">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={nodeTypes}
+        fitView
+        attributionPosition="bottom-right"
+      >
+        <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+        <Controls />
+      </ReactFlow>
+      
+      {/* Indicador de ejecución */}
+      {isExecuting && (
+        <div className="absolute top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+          <Zap className="w-4 h-4 animate-pulse" />
+          <span className="text-sm font-medium">Ejecutando...</span>
+        </div>
+      )}
+    </div>
+  );
+};// components/flow/NodeDetailPanel.tsx - Panel de detalles del nodo
+
+import React from 'react';
+import { X, Cpu, Clock, Zap, FileText, AlertTriangle } from 'lucide-react';
+import { NodeState } from '@/lib/types';
+import { formatExecutionTime, cn } from '@/lib/utils';
+
+/**
+ * Props para el componente NodeDetailPanel
+ */
+interface NodeDetailPanelProps {
+  /** Nodo a mostrar */
+  node: NodeState | null;
+  /** Callback para cerrar el panel */
+  onClose: () => void;
+  /** Clases CSS adicionales */
+  className?: string;
+}
+
+/**
+ * Panel lateral para mostrar detalles de un nodo
+ * @param props - Props del componente
+ */
+export const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
+  node,
+  onClose,
+  className,
+}) => {
+  if (!node) return null;
+
+  const statusColors = {
+    pending: 'text-gray-500 bg-gray-50',
+    running: 'text-blue-500 bg-blue-50',
+    completed: 'text-green-500 bg-green-50',
+    failed: 'text-red-500 bg-red-50',
+    skipped: 'text-amber-500 bg-amber-50',
+  };
+
+  return (
+    <div className={cn("bg-white rounded-lg shadow-xl p-6", className)}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg font-semibold">{node.label}</h3>
+        <button
+          onClick={onClose}
+          className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Status */}
+      <div className="mb-6">
+        <div className={cn("inline-flex items-center px-3 py-1 rounded-full text-sm font-medium", statusColors[node.status])}>
+          {node.status.charAt(0).toUpperCase() + node.status.slice(1)}
+        </div>
+      </div>
+
+      {/* Details */}
+      {node.data && (
+        <div className="space-y-4">
+          {node.data.model && (
+            <div className="flex items-start gap-3">
+              <Cpu className="w-5 h-5 text-gray-400 mt-0.5" />
+              <div>
+                <div className="text-sm font-medium text-gray-700">Modelo</div>
+                <div className="text-sm text-gray-600">{node.data.model}</div>
+              </div>
+            </div>
+          )}
+
+          {node.data.strategy && (
+            <div className="flex items-start gap-3">
+              <Zap className="w-5 h-5 text-gray-400 mt-0.5" />
+              <div>
+                <div className="text-sm font-medium text-gray-700">Estrategia</div>
+                <div className="text-sm text-gray-600">{node.data.strategy}</div>
+              </div>
+            </div>
+          )}
+
+          {node.data.executionTime && (
+            <div className="flex items-start gap-3">
+              <Clock className="w-5 h-5 text-gray-400 mt-0.5" />
+              <div>
+                <div className="text-sm font-medium text-gray-700">Tiempo de ejecución</div>
+                <div className="text-sm text-gray-600">{formatExecutionTime(node.data.executionTime)}</div>
+              </div>
+            </div>
+          )}
+
+          {node.data.tokensUsed && (
+            <div className="flex items-start gap-3">
+              <FileText className="w-5 h-5 text-gray-400 mt-0.5" />
+              <div>
+                <div className="text-sm font-medium text-gray-700">Tokens utilizados</div>
+                <div className="text-sm text-gray-600">{node.data.tokensUsed}</div>
+              </div>
+            </div>
+          )}
+
+          {node.data.decision && (
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-gray-400 mt-0.5" />
+              <div>
+                <div className="text-sm font-medium text-gray-700">Decisión</div>
+                <div className="text-sm text-gray-600">{node.data.decision}</div>
+              </div>
+            </div>
+          )}
+
+          {node.data.error && (
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5" />
+              <div>
+                <div className="text-sm font-medium text-gray-700">Error</div>
+                <div className="text-sm text-red-600">{node.data.error}</div>
+              </div>
+            </div>
+          )}
+
+          {node.data.output && (
+            <div className="mt-6">
+              <div className="text-sm font-medium text-gray-700 mb-2">Output</div>
+              <pre className="text-xs bg-gray-50 p-3 rounded-lg overflow-x-auto">
+                {node.data.output}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};// lib/types.ts - Definiciones de tipos actualizadas para backend real
+
+/**
+ * Estado de un nodo en el grafo de LangGraph
+ */
+export interface NodeState {
+  id: string;
+  type: 
+    | 'task_analyzer' 
+    | 'resource_monitor' 
+    | 'execution' 
+    | 'validator' 
+    | 'history_reader' 
+    | 'summary'
+    | 'model_execution'  // Nuevo: para modelos individuales
+    | 'llm_inference'    // Nuevo: para inferencia directa
+    | 'error'            // Nuevo: para nodos de error
+    | string;            // Flexible para tipos del backend
+  label: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'error';
+  data?: {
+    model?: string;
+    strategy?: string;
+    taskType?: string;
+    vramStatus?: string;
+    executionTime?: number;
+    tokensUsed?: number;
+    output?: string;
+    error?: string;
+    decision?: string;
+    startTime?: number;     // Nuevo: tiempo de inicio
+    endTime?: number;       // Nuevo: tiempo de fin
+  };
+}
+
+/**
+ * Conexión entre nodos del grafo
+ */
+export interface EdgeState {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+  animated?: boolean;
+  style?: {
+    stroke?: string;
+    strokeDasharray?: string;
+  };
+}
+
+/**
+ * Estado completo del flujo de ejecución
+ */
+export interface FlowState {
+  nodes: NodeState[];
+  edges: EdgeState[];
+  currentNode?: string;
+  startTime?: number;
+  endTime?: number;
+  totalTokens?: number;
+  finalOutput?: string;
+}
+
+/**
+ * Configuración de un modelo LLM
+ */
+export interface ModelConfig {
+  key: string;
+  name: string;
+  type: 'local' | 'api';
+  available: boolean;
+  loaded?: boolean;        // Nuevo: si está cargado en cache
+  vramRequired?: number;
+  defaultStrategy?: 'standard' | 'optimized' | 'streaming';
+}
+
+/**
+ * Parámetros de generación
+ */
+export interface GenerationParams {
+  prompt: string;
+  model?: string;
+  modelKey?: string;       // Nuevo: clave del modelo (alias para compatibilidad)
+  strategy?: string;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+}
+
+/**
+ * Métricas del sistema
+ */
+export interface SystemMetrics {
+  gpuAvailable: boolean;
+  vramTotal: number;
+  vramUsed: number;
+  vramFree: number;
+  cpuUsage?: number;
+  modelsInCache: string[];
+  uptime?: string;         // Nuevo: tiempo de actividad
+  memoryStatus?: string;   // Nuevo: estado de memoria (excellent/warning/critical)
+  modelsCached?: number;   // Nuevo: número de modelos en cache
+}
+
+/**
+ * Métricas de ejecución extendidas
+ */
+export interface ExecutionMetrics {
+  totalTime: number;
+  tokensGenerated: number;
+  modelsUsed: string[];
+  cacheHit?: boolean;      // Nuevo: si fue cache hit
+  loadTime?: number;       // Nuevo: tiempo de carga del modelo
+  inferenceTime?: number;  // Nuevo: tiempo de inferencia
+  gpuInfo?: any;          // Nuevo: información de GPU
+}
+
+/**
+ * Resultado de una ejecución
+ */
+export interface ExecutionResult {
+  id: string;
+  timestamp: number;
+  params: GenerationParams;
+  flow: FlowState;
+  output: string;
+  metrics: ExecutionMetrics;
+}
+
+/**
+ * Payload para enviar una ejecución al backend
+ */
+export interface ExecutionPayload {
+  prompt: string;
+  model: 'gpt-4' | 'claude-3' | 'local-llama' | 'mistral7b' | 'llama3' | 'deepseek7b' | 'deepseek-coder';
+  strategy?: 'standard' | 'optimized' | 'streaming';
+  user_id?: string;
+  temperature?: number;
+  max_tokens?: number;
+}
+
+/**
+ * Evento WebSocket enviado por el backend
+ */
+export interface WebSocketEvent {
+  type: 'start' | 'token' | 'retry' | 'error' | 'done';
+  data: any;
+  session_id: string;
+  timestamp: number;
+}
+
+/**
+ * Estado de una sesión de streaming
+ */
+export interface StreamState {
+  isConnected: boolean;
+  isProcessing: boolean;
+  currentTokens: string[];
+  logs: { message: string; timestamp: number }[];
+  error?: string;
+}
+
+/**
+ * Información del cache de modelos (nuevo)
+ */
+export interface CacheInfo {
+  cached_models: Record<string, {
+    model_key: string;
+    strategy: string;
+    loaded_at: string;
+    last_used: string;
+    memory_usage_gb: number;
+  }>;
+  memory_stats: {
+    cache_size: number;
+    loaded_models: [string, string][];
+    gpu_info: any;
+    memory_pressure: boolean;
+    max_vram_limit_gb: number;
+  };
+  cache_size: number;
+}
+
+/**
+ * Respuesta del health check (nuevo)
+ */
+export interface HealthResponse {
+  status: string;
+  gpu_info: {
+    cuda: boolean;
+    device: string;
+    device_id: number;
+    total_gb: number;
+    allocated_gb: number;
+    free_gb: number;
+    memory_status: string;
+  };
+  models_loaded: number;
+  models_cached?: number;
+  uptime: string;
+}
+
+/**
+ * Request para ejecutar modelo (nuevo)
+ */
+export interface ExecutionRequest {
+  prompt: string;
+  model?: string;
+  strategy?: 'standard' | 'optimized' | 'streaming';
+  temperature?: number;
+  max_tokens?: number;
+}
+
+/**
+ * Response del backend para ejecución (nuevo)
+ */
+export interface ExecutionResponse {
+  id: string;
+  timestamp: string;
+  prompt: string;
+  output: string;
+  flow: {
+    nodes: Array<{
+      id: string;
+      name: string;
+      type: string;
+      status: 'pending' | 'running' | 'completed' | 'error';
+      start_time?: number;
+      end_time?: number;
+      output?: string;
+      error?: string;
+    }>;
+    edges: Array<{
+      source: string;
+      target: string;
+      label?: string;
+    }>;
+    current_node?: string;
+  };
+  metrics: {
+    total_time: number;
+    tokens_generated?: number;
+    models_used?: string[];
+    cache_hit?: boolean;
+    load_time_sec?: number;
+    inference_time_sec?: number;
+    gpu_info?: any;
+  };
+  success: boolean;
+}
+
+/**
+ * Tipos para hooks de React Query (nuevo)
+ */
+export interface UseExecutionOptions {
+  onSuccess?: (data: ExecutionResult) => void;
+  onError?: (error: Error) => void;
+  timeout?: number;
+}
+
+export interface UseModelsOptions {
+  refetchInterval?: number;
+  enabled?: boolean;
+}
+
+export interface UseSystemMetricsOptions {
+  refetchInterval?: number;
+  enabled?: boolean;
+}
+
+/**
+ * Estados de UI (nuevo)
+ */
+export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
+
+export interface UIState {
+  isExecuting: boolean;
+  loadingState: LoadingState;
+  error?: string;
+  selectedModel?: string;
+  selectedStrategy?: string;
+}
+
+/**
+ * Configuración de la aplicación (nuevo)
+ */
+export interface AppConfig {
+  apiUrl: string;
+  mockMode: boolean;
+  defaultModel: string;
+  defaultStrategy: string;
+  defaultMaxTokens: number;
+  defaultTemperature: number;
+}
+
+/**
+ * Configuración para orchestrator (nuevo)
+ */
+export interface OrchestratorConfig {
+  agents: string[];
+  tools: string[];
+  verbose: boolean;
+  enable_history: boolean;
+  retry_on_error: boolean;
+}
+
+/**
+ * Request actualizado para execution_type (nuevo)
+ */
+export interface ExecutionRequest {
+  prompt: string;
+  model?: string;
+  execution_type: 'simple' | 'orchestrator';
+  
+  // Campos para simple LLM (existentes)
+  strategy?: 'standard' | 'optimized' | 'streaming';
+  temperature?: number;
+  max_tokens?: number;
+  
+  // Campos para orchestrator (nuevos)
+  agents?: string[];
+  tools?: string[];
+  verbose?: boolean;
+  enable_history?: boolean;
+  retry_on_error?: boolean;
+}// lib/api.ts - Cliente API actualizado para backend real
+
+import axios from 'axios';
+import type { 
+  GenerationParams, 
+  ExecutionResult, 
+  SystemMetrics, 
+  ModelConfig, 
+  FlowState, 
+  ExecutionPayload, 
+  WebSocketEvent,
+  ExecutionRequest
+} from './types';
+
+// Tipos específicos del backend
+interface BackendExecutionRequest {
+  prompt: string;
+  model?: string;
+  strategy?: string;
+  temperature?: number;
+  max_tokens?: number;
+}
+
+interface BackendExecutionResponse {
+  id: string;
+  timestamp: string;
+  prompt: string;
+  output: string;
+  flow: {
+    nodes: Array<{
+      id: string;
+      name: string;
+      type: string;
+      status: 'pending' | 'running' | 'completed' | 'error';
+      start_time?: number;
+      end_time?: number;
+      output?: string;
+      error?: string;
+    }>;
+    edges: Array<{
+      source: string;
+      target: string;
+      label?: string;
+    }>;
+    current_node?: string;
+  };
+  metrics: {
+    total_time: number;
+    tokens_generated?: number;
+    models_used?: string[];
+    cache_hit?: boolean;
+    load_time_sec?: number;
+    inference_time_sec?: number;
+    gpu_info?: any;
+  };
+  success: boolean;
+}
+
+interface BackendModelInfo {
+  key: string;
+  name: string;
+  available: boolean;
+  loaded?: boolean;
+}
+
+interface BackendHealthResponse {
+  status: string;
+  gpu_info: {
+    cuda: boolean;
+    device: string;
+    total_gb: number;
+    allocated_gb: number;
+    free_gb: number;
+    memory_status: string;
+  };
+  models_loaded: number;
+  models_cached: number;
+  uptime: string;
+}
+
+/**
+ * Cliente API para comunicarse con el backend FastAPI
+ */
+class ApiClient {
+  private baseURL: string;
+  private mockMode: boolean;
+
+  constructor() {
+    this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    this.mockMode = process.env.NEXT_PUBLIC_MOCK_MODE === 'true';
+  }
+
+  /**
+   * Obtiene la lista de modelos disponibles del backend
+   */
+  async getModels(): Promise<ModelConfig[]> {
+    if (this.mockMode) {
+      return this.getMockModels();
+    }
+
+    try {
+      // Llamar al endpoint del backend que llama al lab
+      const response = await axios.get(`${this.baseURL}/api/v1/models`);
+      
+      // Si el backend no tiene endpoint de modelos, llamar directamente al lab
+      const labResponse = await axios.get('http://localhost:8001/models/');
+      
+      return labResponse.data.map((model: BackendModelInfo): ModelConfig => ({
+        key: model.key,
+        name: model.name,
+        type: 'local',
+        available: model.available,
+        loaded: model.loaded,
+        vramRequired: this.getEstimatedVRAM(model.key),
+      }));
+    } catch (error) {
+      console.error('Error fetching models:', error);
+      // Fallback a modelos conocidos
+      return [
+        { key: 'mistral7b', name: 'Mistral 7B Instruct', type: 'local', available: true, vramRequired: 4 },
+        { key: 'llama3', name: 'Llama 3 8B Instruct', type: 'local', available: true, vramRequired: 5 },
+        { key: 'deepseek7b', name: 'DeepSeek 7B Instruct', type: 'local', available: true, vramRequired: 4 },
+        { key: 'deepseek-coder', name: 'DeepSeek Coder 6.7B', type: 'local', available: true, vramRequired: 4 },
+      ];
+    }
+  }
+
+  /**
+   * Obtiene las métricas del sistema desde el backend/lab
+   */
+  async getSystemMetrics(): Promise<SystemMetrics> {
+    if (this.mockMode) {
+      return this.getMockMetrics();
+    }
+
+    try {
+      // Intentar backend primero
+      let healthData: BackendHealthResponse;
+      
+      try {
+        const backendResponse = await axios.get(`${this.baseURL}/api/v1/health`);
+        healthData = backendResponse.data;
+      } catch {
+        // Fallback al lab directo
+        const labResponse = await axios.get('http://localhost:8001/health/');
+        healthData = labResponse.data;
+      }
+
+      // Obtener cache info del lab
+      let cacheData: any = {};
+      try {
+        const cacheResponse = await axios.get('http://localhost:8001/cache/');
+        cacheData = cacheResponse.data;
+      } catch {
+        console.warn('Could not fetch cache data');
+      }
+
+      return {
+        gpuAvailable: healthData.gpu_info.cuda,
+        vramTotal: healthData.gpu_info.total_gb,
+        vramUsed: healthData.gpu_info.allocated_gb,
+        vramFree: healthData.gpu_info.free_gb,
+        cpuUsage: 0, // No disponible en el backend actual
+        modelsInCache: Object.keys(cacheData.cached_models || {}),
+        uptime: healthData.uptime,
+        memoryStatus: healthData.gpu_info.memory_status,
+        modelsCached: healthData.models_cached || 0,
+      };
+    } catch (error) {
+      console.error('Error fetching system metrics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Ejecuta una generación usando el backend real
+   */
+  async generate(params: GenerationParams): Promise<ExecutionResult> {
+    if (this.mockMode) {
+      return this.getMockGeneration(params);
+    }
+
+    try {
+      const backendRequest: BackendExecutionRequest = {
+        prompt: params.prompt,
+        model: params.modelKey || 'mistral7b',
+        strategy: params.strategy || 'optimized',
+        temperature: params.temperature || 0.7,
+        max_tokens: params.maxTokens || 512,
+      };
+
+      const response = await axios.post<BackendExecutionResponse>(
+        `${this.baseURL}/api/v1/execute`,
+        backendRequest,
+        {
+          timeout: 300000, // 5 minutos timeout para modelos pesados
+        }
+      );
+
+      return this.mapBackendResponseToExecutionResult(response.data, params);
+    } catch (error) {
+      console.error('Error executing generation:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Limpia el cache de modelos
+   */
+  async clearCache(): Promise<void> {
+    try {
+      await axios.post('http://localhost:8001/cache/clear/');
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Descarga un modelo específico del cache
+   */
+  async unloadModel(modelKey: string, strategy: string = 'optimized'): Promise<void> {
+    try {
+      await axios.delete(`http://localhost:8001/cache/${modelKey}?strategy=${strategy}`);
+    } catch (error) {
+      console.error('Error unloading model:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene el estado del cache
+   */
+  async getCacheStatus(): Promise<any> {
+    try {
+      const response = await axios.get('http://localhost:8001/cache/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching cache status:', error);
+      throw error;
+    }
+  }
+
+  // Métodos privados
+  private getEstimatedVRAM(modelKey: string): number {
+    const vramMap: Record<string, number> = {
+      'mistral7b': 4,
+      'llama3': 5,
+      'deepseek7b': 4,
+      'deepseek-coder': 4,
+    };
+    return vramMap[modelKey] || 4;
+  }
+
+  private mapBackendResponseToExecutionResult(
+    response: BackendExecutionResponse,
+    params: GenerationParams
+  ): ExecutionResult {
+    const flow: FlowState = {
+      nodes: response.flow.nodes.map(node => ({
+        id: node.id,
+        type: node.type,
+        label: node.name,
+        status: node.status,
+        data: {
+          output: node.output,
+          error: node.error,
+          startTime: node.start_time,
+          endTime: node.end_time,
+        },
+      })),
+      edges: response.flow.edges.map(edge => ({
+        id: `${edge.source}-${edge.target}`,
+        source: edge.source,
+        target: edge.target,
+        label: edge.label,
+      })),
+      currentNode: response.flow.current_node,
+      finalOutput: response.output,
+    };
+
+    return {
+      id: response.id,
+      timestamp: new Date(response.timestamp).getTime(),
+      params,
+      flow,
+      output: response.output,
+      metrics: {
+        totalTime: response.metrics.total_time * 1000, // Backend en segundos, frontend en ms
+        tokensGenerated: response.metrics.tokens_generated || 0,
+        modelsUsed: response.metrics.models_used || [params.modelKey || 'unknown'],
+        cacheHit: response.metrics.cache_hit,
+        loadTime: (response.metrics.load_time_sec || 0) * 1000,
+        inferenceTime: (response.metrics.inference_time_sec || 0) * 1000,
+        gpuInfo: response.metrics.gpu_info,
+      },
+    };
+  }
+
+  // Métodos mock (mantener para desarrollo)
+  private getMockModels(): ModelConfig[] {
+    return [
+      { key: 'llama3', name: 'Llama 3 8B', type: 'local', available: true, vramRequired: 16 },
+      { key: 'mistral7b', name: 'Mistral 7B', type: 'local', available: true, vramRequired: 14 },
+      { key: 'deepseek7b', name: 'DeepSeek 7B', type: 'local', available: true, vramRequired: 14 },
+      { key: 'deepseek-coder', name: 'DeepSeek Coder', type: 'local', available: true, vramRequired: 13 },
+    ];
+  }
+
+  private getMockMetrics(): SystemMetrics {
+    return {
+      gpuAvailable: true,
+      vramTotal: 8,
+      vramUsed: 3.85,
+      vramFree: 4.15,
+      cpuUsage: 45,
+      modelsInCache: ['mistral7b'],
+      uptime: '2h 15m',
+      memoryStatus: 'warning',
+      modelsCached: 1,
+    };
+  }
+
+  private async getMockGeneration(params: GenerationParams): Promise<ExecutionResult> {
+    // Simular delay de red
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const flow: FlowState = {
+      nodes: [
+        { 
+          id: '1', 
+          type: 'model_execution', 
+          label: `Model: ${params.modelKey}`, 
+          status: 'completed',
+          data: { 
+            model: params.modelKey,
+            strategy: params.strategy,
+            output: 'Model execution completed successfully'
+          }
+        },
+      ],
+      edges: [],
+      finalOutput: `Mock response for prompt: "${params.prompt}"`,
+    };
+
+    return {
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      params,
+      flow,
+      output: flow.finalOutput || '',
+      metrics: {
+        totalTime: 3500,
+        tokensGenerated: 150,
+        modelsUsed: [params.modelKey || 'mistral7b'],
+        cacheHit: Math.random() > 0.5,
+        loadTime: Math.random() > 0.5 ? 0 : 2000,
+        inferenceTime: 1500,
+      },
+    };
+  }
+
+  // Métodos legacy para compatibilidad
+  async execute(payload: ExecutionPayload): Promise<Response> {
+    const response = await fetch(`${this.baseURL}/api/v1/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return response;
+  }
+
+  async getHistory(userId?: string): Promise<ExecutionResult[]> {
+    // TODO: Implementar cuando el backend tenga historial
+    return [];
+  }
+
+  createWebSocketConnection(): WebSocket {
+    return new WebSocket(`${this.baseURL.replace(/^http/, 'ws')}/ws`);
+  }
+
+  /**
+ * Ejecuta una generación usando execution_type (simple o orchestrator)
+ */
+async executeWithType(request: ExecutionRequest): Promise<ExecutionResult> {
+  if (this.mockMode) {
+    // Convertir ExecutionRequest a GenerationParams para mock
+    const params: GenerationParams = {
+      prompt: request.prompt,
+      modelKey: request.model || 'mistral7b',
+      strategy: request.strategy,
+      temperature: request.temperature,
+      maxTokens: request.max_tokens,
+    };
+    return this.getMockGeneration(params);
+  }
+
+  try {
+    const response = await axios.post<BackendExecutionResponse>(
+      `${this.baseURL}/api/v1/execute`,
+      request,
+      {
+        timeout: 300000, // 5 minutos timeout para orchestrator
+      }
+    );
+
+    // Convertir a ExecutionResult usando el método existente
+    const params: GenerationParams = {
+      prompt: request.prompt,
+      modelKey: request.model || 'mistral7b',
+      strategy: request.strategy,
+      temperature: request.temperature,
+      maxTokens: request.max_tokens,
+    };
+
+    return this.mapBackendResponseToExecutionResult(response.data, params);
+  } catch (error) {
+    console.error('Error executing with type:', error);
+    throw error;
+  }
+}
+}
+
+export const api = new ApiClient();// hooks/useExecution.ts - Hook para manejar la ejecución (actualizado)
+
+import { useState, useCallback } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { create } from 'zustand';
+import { api } from '@/lib/api';
+import { GenerationParams, ExecutionResult, FlowState, NodeState, ExecutionRequest } from '@/lib/types';
+import { useConfigStore } from '@/store/configStore';
+
+/**
+ * Store de Zustand para el estado de ejecución
+ */
+interface ExecutionStore {
+  currentExecution: ExecutionResult | null;
+  executionHistory: ExecutionResult[];
+  setCurrentExecution: (execution: ExecutionResult | null) => void;
+  addToHistory: (execution: ExecutionResult) => void;
+  clearHistory: () => void;
+}
+
+export const useExecutionStore = create<ExecutionStore>((set) => ({
+  currentExecution: null,
+  executionHistory: [],
+  setCurrentExecution: (execution) => set({ currentExecution: execution }),
+  addToHistory: (execution) =>
+    set((state) => ({
+      executionHistory: [execution, ...state.executionHistory].slice(0, 10), // Mantener últimas 10
+    })),
+  clearHistory: () => set({ executionHistory: [] }),
+}));
+
+/**
+ * Hook personalizado para manejar la ejecución de prompts
+ * @returns Objeto con funciones y estado de ejecución
+ */
+export function useExecution() {
+  const { currentExecution, setCurrentExecution, addToHistory } = useExecutionStore();
+  const [isExecuting, setIsExecuting] = useState(false);
+
+  // Simular actualizaciones del flujo durante la ejecución
+  const simulateFlowUpdates = useCallback(async (execution: ExecutionResult) => {
+    const nodes = execution.flow.nodes;
+    const totalNodes = nodes.length;
+    
+    for (let i = 0; i < totalNodes; i++) {
+      // Actualizar nodo actual a "running"
+      const updatedNodes = [...nodes];
+      updatedNodes[i] = { ...updatedNodes[i], status: 'running' as const };
+      
+      setCurrentExecution({
+        ...execution,
+        flow: {
+          ...execution.flow,
+          nodes: updatedNodes,
+          currentNode: updatedNodes[i].id,
+        },
+      });
+      
+      // Simular tiempo de procesamiento
+      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
+      
+      // Actualizar nodo a "completed"
+      updatedNodes[i] = { ...updatedNodes[i], status: 'completed' as const };
+      setCurrentExecution({
+        ...execution,
+        flow: {
+          ...execution.flow,
+          nodes: updatedNodes,
+          currentNode: i < totalNodes - 1 ? updatedNodes[i + 1].id : undefined,
+        },
+      });
+    }
+  }, [setCurrentExecution]);
+
+  const executeMutation = useMutation({
+    mutationFn: async (params: GenerationParams) => {
+      console.log('🚀 Executing with params:', params);
+      
+      setIsExecuting(true);
+      
+      // Obtener configuración actual del store
+      const config = useConfigStore.getState();
+      
+      // Completar parámetros con valores del store
+      const fullParams: GenerationParams = {
+        ...params,
+        modelKey: params.modelKey || params.model || config.defaultModel,
+        model: params.model || params.modelKey || config.defaultModel,
+        strategy: (params.strategy || config.defaultStrategy) as 'standard' | 'optimized' | 'streaming',
+        temperature: params.temperature || config.temperature,
+        maxTokens: params.maxTokens || config.maxTokens,
+      };
+
+      console.log('🔧 Full params:', fullParams);
+      console.log('🎯 Execution type:', config.executionType);
+      
+      // En modo mock, simular actualizaciones progresivas
+      if (process.env.NEXT_PUBLIC_MOCK_MODE === 'true') {
+        console.log('📝 Using mock mode');
+        const result = await api.generate(fullParams);
+        
+        // Iniciar con todos los nodos en "pending"
+        const initialFlow: FlowState = {
+          ...result.flow,
+          nodes: result.flow.nodes.map(node => ({ ...node, status: 'pending' as const })),
+        };
+        
+        const initialExecution = { ...result, flow: initialFlow };
+        setCurrentExecution(initialExecution);
+        
+        // Simular actualizaciones progresivas
+        await simulateFlowUpdates(result);
+        
+        return result;
+      }
+      
+      // En modo real, elegir entre simple y orchestrator
+      console.log('🌐 Using real API mode');
+      
+      if (config.executionType === 'orchestrator') {
+        console.log('🤖 Using orchestrator mode');
+        
+        const executionRequest: ExecutionRequest = {
+          prompt: params.prompt,
+          model: fullParams.modelKey,
+          execution_type: 'orchestrator',
+          strategy: fullParams.strategy as 'standard' | 'optimized' | 'streaming' | undefined,
+          temperature: fullParams.temperature,
+          max_tokens: fullParams.maxTokens,
+          agents: config.orchestrator.agents,
+          tools: config.orchestrator.tools,
+          verbose: config.orchestrator.verbose,
+          enable_history: config.orchestrator.enable_history,
+          retry_on_error: config.orchestrator.retry_on_error,
+        };
+        
+        console.log('🔧 Orchestrator request:', executionRequest);
+        const result = await api.executeWithType(executionRequest);
+        console.log('✅ Orchestrator response:', result);
+        
+        return result;
+      } else {
+        console.log('⚡ Using simple LLM mode');
+        
+        const executionRequest: ExecutionRequest = {
+          prompt: params.prompt,
+          model: fullParams.modelKey,
+          execution_type: 'simple',
+          strategy: fullParams.strategy as 'standard' | 'optimized' | 'streaming' | undefined,
+          temperature: fullParams.temperature,
+          max_tokens: fullParams.maxTokens,
+        };
+        
+        console.log('🔧 Simple request:', executionRequest);
+        const result = await api.executeWithType(executionRequest);
+        console.log('✅ Simple response:', result);
+        
+        return result;
+      }
+    },
+    onSuccess: (data) => {
+      console.log('✅ Execution successful:', data);
+      setCurrentExecution(data);
+      addToHistory(data);
+    },
+    onError: (error) => {
+      console.error('❌ Execution failed:', error);
+    },
+    onSettled: () => {
+      setIsExecuting(false);
+    },
+  });
+
+  return {
+    execute: executeMutation.mutate,
+    isExecuting,
+    currentExecution,
+    error: executeMutation.error,
+  };
+}// store/configStore.ts - Store para configuración global (actualizado)
+
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+interface ConfigStore {
+  // Configuración existente
+  defaultModel: string;
+  defaultStrategy: string;
+  temperature: number;
+  maxTokens: number;
+  mockMode: boolean;
+  
+  // ✅ NUEVO: Tipo de ejecución
+  executionType: 'simple' | 'orchestrator';
+  
+  // ✅ NUEVO: Configuración del orchestrator
+  orchestrator: {
+    agents: string[];
+    tools: string[];
+    verbose: boolean;
+    enable_history: boolean;
+    retry_on_error: boolean;
+  };
+  
+  // Actions existentes
+  setDefaultModel: (model: string) => void;
+  setDefaultStrategy: (strategy: string) => void;
+  setTemperature: (temp: number) => void;
+  setMaxTokens: (tokens: number) => void;
+  toggleMockMode: () => void;
+  
+  // ✅ NUEVO: Actions para orchestrator
+  setExecutionType: (type: 'simple' | 'orchestrator') => void;
+  setOrchestratorAgents: (agents: string[]) => void;
+  setOrchestratorTools: (tools: string[]) => void;
+  setOrchestratorVerbose: (verbose: boolean) => void;
+  setOrchestratorHistory: (enable: boolean) => void;
+  setOrchestratorRetry: (retry: boolean) => void;
+}
+
+export const useConfigStore = create<ConfigStore>()(
+  persist(
+    (set) => ({
+      // Estado inicial existente
+      defaultModel: 'mistral7b',
+      defaultStrategy: 'optimized',
+      temperature: 0.7,
+      maxTokens: 512,
+      mockMode: true,
+      
+      // ✅ NUEVO: Estado inicial para orchestrator
+      executionType: 'simple',
+      orchestrator: {
+        agents: ['research_agent', 'knowledge_agent'],
+        tools: ['web_search', 'wikipedia'],
+        verbose: false,
+        enable_history: true,
+        retry_on_error: true,
+      },
+      
+      // Actions existentes
+      setDefaultModel: (model) => set({ defaultModel: model }),
+      setDefaultStrategy: (strategy) => set({ defaultStrategy: strategy }),
+      setTemperature: (temp) => set({ temperature: temp }),
+      setMaxTokens: (tokens) => set({ maxTokens: tokens }),
+      toggleMockMode: () => set((state) => ({ mockMode: !state.mockMode })),
+      
+      // ✅ NUEVO: Actions para orchestrator
+      setExecutionType: (executionType) => set({ executionType }),
+      setOrchestratorAgents: (agents) => 
+        set((state) => ({ 
+          orchestrator: { ...state.orchestrator, agents } 
+        })),
+      setOrchestratorTools: (tools) => 
+        set((state) => ({ 
+          orchestrator: { ...state.orchestrator, tools } 
+        })),
+      setOrchestratorVerbose: (verbose) => 
+        set((state) => ({ 
+          orchestrator: { ...state.orchestrator, verbose } 
+        })),
+      setOrchestratorHistory: (enable_history) => 
+        set((state) => ({ 
+          orchestrator: { ...state.orchestrator, enable_history } 
+        })),
+      setOrchestratorRetry: (retry_on_error) => 
+        set((state) => ({ 
+          orchestrator: { ...state.orchestrator, retry_on_error } 
+        })),
+    }),
+    {
+      name: 'ai-agent-lab-config',
+    }
+  )
+);

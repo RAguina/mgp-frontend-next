@@ -27,6 +27,7 @@ frontend/
 │   │   └── ExecutionTypeSelector.tsx  (*NUEVO*)
 │   ├── output/
 │   │   ├── OutputDisplay.tsx
+│   │   ├── DynamicOutputDisplay.tsx  (*NUEVO*)
 │   │   └── ExportControls.tsx
 │   ├── ui/
 │   │   ├── ExportButton.tsx
@@ -41,7 +42,10 @@ frontend/
 ├── lib/
 │   ├── api.ts  (*ACTUALIZADO*)
 │   ├── types.ts  (*ACTUALIZADO*)
-│   └── utils.ts
+│   ├── utils.ts
+│   ├── flowRegistry.ts  (*NUEVO*)
+│   ├── flowDefinitions.ts  (*NUEVO*)
+│   └── flowAdapter.ts  (*NUEVO*)
 ├── mocks/
 │   ├── fullExecution.mock.ts
 │   ├── logs.mock.ts
@@ -54,6 +58,7 @@ frontend/
 │   └── useExecutionStore.ts (incluido en useExecution.ts)
 ├── next-env.d.ts
 └── next.config.ts
+
 
 ---
 
@@ -84,6 +89,7 @@ frontend/
 #### `output/`
 - `OutputDisplay.tsx`: Muestra la salida generada.
 - `ExportControls.tsx`: Botones de exportación inteligentes.
+- `DynamicOutputDisplay.tsx`: (NUEVO) Visualización adaptable al tipo de flujo (linear, challenge, etc).
 
 #### `ui/`
 - `ExportButton.tsx`: Componente para descarga de archivos.
@@ -101,6 +107,9 @@ frontend/
 - `api.ts`: (*ACTUALIZADO*) Cliente API con soporte para executeWithType() y URLs corregidas.
 - `types.ts`: (*ACTUALIZADO*) Tipos globales incluyendo ExecutionRequest con execution_type.
 - `utils.ts`: Helpers varios.
+- `flowRegistry.ts`: (NUEVO) Registry singleton para gestión de flujos disponibles (linear, challenge, research).
+- `flowDefinitions.ts`: (NUEVO) Tipos e interfaces para definir flujos de manera declarativa.
+- `flowAdapter.ts`: (NUEVO) Adaptadores para enriquecer ExecutionResult con información de flujos y extraer outputs por nodo.
 
 ### `mocks/`
 - `fullExecution.mock.ts`: Resultado completo de una ejecución.
@@ -116,7 +125,9 @@ frontend/
 
 ---
 
-## 🆕 Cambios Principales Implementados
+
+
+## v0.03 🆕 Cambios Principales Implementados  - 2025 - 16 - 08
 
 ### **Soporte para Orchestrator:**
 1. **ExecutionTypeSelector**: Nuevo componente para toggle Simple LLM vs Orchestrator
@@ -136,8 +147,9 @@ frontend/
 
 ---
 
-## ✅ Buenas Prácticas Mantenidas
+## v0.02 🆕 Cambios Principales Implementados  - 2025 - 09- 05
 
+## ✅ Buenas Prácticas Mantenidas
 - Todos los mocks están en /mocks y centralizados vía index.ts.
 - Hooks y stores están desacoplados y enfocados por responsabilidad.
 - El componente ExportControls evita duplicación de lógica y usa ExportButton.
@@ -145,23 +157,54 @@ frontend/
 - El layout usa Grid de 12 columnas para organización clara: 4 (consola) + 5 (tabs) + 3 (detalle).
 - Componentes marcados con TODO: ya están placeholders y listos para reemplazar.
 
-## 🔄 Flujo de Ejecución Actualizado
+---
 
-1. **Usuario selecciona execution type** en ExecutionTypeSelector
-2. **Configuración condicional** aparece para orchestrator (agents, tools, verbose)
-3. **Submit prompt** → useExecution hook determina tipo
-4. **API call** → executeWithType() con ExecutionRequest completo
-5. **Backend routing** → simple vs orchestrator path
-6. **Response handling** → UI actualizada con flow específico
+## 🆕 Cambios Principales Implementados
 
-## 🎯 Estado Actual
+### Sistema de Flujos Dinámicos
+- **FlowRegistry**: Sistema de registro para flujos configurables (linear, challenge, research).
+- **DynamicOutputDisplay**: Componente genérico que adapta visualización según tipo de flujo.
+- **Challenge Flow**: Soporte completo para flujo creator→challenger→refiner.
+- **FlowAdapter**: Enriquece respuestas con definiciones de flujo y extrae outputs por nodo.
 
-- ✅ **Simple LLM**: Completamente funcional end-to-end
-- 🔄 **Orchestrator**: Backend y frontend ready, pendiente testing completo
-- ✅ **UI/UX**: Toggle funcional con configuración condicional
-- ✅ **Performance**: Health checks optimizados
-- 🔄 **Error handling**: Básico implementado, mejorable
+### Soporte Expandido para Ejecución
+- **ExecutionTypeSelector**: Selector dinámico que lee flujos del registry.
+- **ConfigStore expandido**: Incluye selectedFlowId, execution_type con 'challenge'.
+- **API actualizada**: executeWithType() con soporte para flow_type.
+- **Types actualizados**: `ExecutionRequest` incluye flow_type para especificar grafo a ejecutar.
+
+### Arquitectura de Flujos
+- **Simple LLM**: Ejecución directa con modelo único.
+- **Linear Flow**: Orchestrator tradicional con agents y tools.
+- **Challenge Flow**: Debate entre modelos (creator→challenger→refiner).
+- **Extensible**: Nuevos flujos se agregan solo con configuración JSON.
+
+### Optimizaciones de Rendimiento
+- **Health checks optimizados**: Reducidos de 5s a 30s intervals.
+- **URLs corregidas**: Barras finales para evitar 307 redirects.
+- **React Query optimizado**: Singleton pattern y staleTime configurado.
 
 ---
 
-*Última actualización: Post-implementación de Orchestrator integration*
+## 🔄 Flujo de Ejecución Actualizado
+1. **Usuario selecciona flujo** en ExecutionTypeSelector (simple/linear/challenge).
+2. **FlowRegistry provee configuración** del flujo seleccionado.
+3. **Submit prompt** → useExecution construye request con flow_type.
+4. **API call** → executeWithType() incluye flow_type en request.
+5. **Backend routing** → Lab ejecuta grafo específico según flow_type.
+6. **Response processing** → FlowAdapter enriquece resultado con definición.
+7. **UI rendering** → DynamicOutputDisplay adapta visualización al tipo de flujo.
+
+---
+
+## 🔧 Extensibilidad de Flujos
+### Agregar un nuevo flujo
+1. Crear definición en `flowRegistry.ts`:
+   ```typescript
+   flowRegistry.register({
+     id: 'nuevo_flujo',
+     name: 'Mi Nuevo Flujo',
+     layout: 'horizontal',
+     display: { type: 'tabs' },
+     requestConfig: { execution_type: 'orchestrator', flow_type: 'nuevo_flujo' }
+   })

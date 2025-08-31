@@ -310,9 +310,9 @@ export interface OrchestratorConfig {
 export interface ExecutionRequest {
   prompt: string;
   model?: string;
-  execution_type: 'simple' | 'orchestrator';
   
   // Campos para simple LLM (existentes)
+  execution_type: 'simple' | 'orchestrator' | 'challenge';
   strategy?: 'standard' | 'optimized' | 'streaming';
   temperature?: number;
   max_tokens?: number;
@@ -323,4 +323,7 @@ export interface ExecutionRequest {
   verbose?: boolean;
   enable_history?: boolean;
   retry_on_error?: boolean;
+
+  // ✅ NUEVO: Campo para especificar el tipo de flujo
+  flow_type?: string; // 'linear' | 'challenge' | 'research' | etc.
 }

@@ -1,4 +1,4 @@
-// hooks/useExecution.ts - Hook para manejar la ejecución (actualizado)
+// hooks/useExecution.ts - Hook para manejar la ejecución con soporte para flujos dinámicos
 
 import { useState, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
@@ -6,6 +6,8 @@ import { create } from 'zustand';
 import { api } from '@/lib/api';
 import { GenerationParams, ExecutionResult, FlowState, NodeState, ExecutionRequest } from '@/lib/types';
 import { useConfigStore } from '@/store/configStore';
+import { flowRegistry } from '@/lib/flowRegistry';
+import { FlowAdapter } from '@/lib/flowAdapter';
 
 /**
  * Store de Zustand para el estado de ejecución
@@ -30,7 +32,7 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
 }));
 
 /**
- * Hook personalizado para manejar la ejecución de prompts
+ * Hook personalizado para manejar la ejecución de prompts con soporte para flujos
  * @returns Objeto con funciones y estado de ejecución
  */
 export function useExecution() {
@@ -81,6 +83,13 @@ export function useExecution() {
       // Obtener configuración actual del store
       const config = useConfigStore.getState();
       
+      // Obtener el flujo seleccionado del registry
+      const selectedFlow = config.selectedFlowId 
+        ? flowRegistry.get(config.selectedFlowId)
+        : undefined;
+      
+      console.log('📋 Selected flow:', selectedFlow?.name || 'none');
+      
       // Completar parámetros con valores del store
       const fullParams: GenerationParams = {
         ...params,
@@ -93,37 +102,73 @@ export function useExecution() {
 
       console.log('🔧 Full params:', fullParams);
       console.log('🎯 Execution type:', config.executionType);
+      console.log('🔄 Flow ID:', config.selectedFlowId);
       
       // En modo mock, simular actualizaciones progresivas
       if (process.env.NEXT_PUBLIC_MOCK_MODE === 'true') {
         console.log('📝 Using mock mode');
         const result = await api.generate(fullParams);
         
+        // Si hay un flujo seleccionado, enriquecer el resultado
+        const enrichedResult = selectedFlow 
+          ? FlowAdapter.enrichExecutionResult(result, selectedFlow)
+          : result;
+        
         // Iniciar con todos los nodos en "pending"
         const initialFlow: FlowState = {
-          ...result.flow,
-          nodes: result.flow.nodes.map(node => ({ ...node, status: 'pending' as const })),
+          ...enrichedResult.flow,
+          nodes: enrichedResult.flow.nodes.map(node => ({ ...node, status: 'pending' as const })),
         };
         
-        const initialExecution = { ...result, flow: initialFlow };
+        const initialExecution = { ...enrichedResult, flow: initialFlow };
         setCurrentExecution(initialExecution);
         
         // Simular actualizaciones progresivas
-        await simulateFlowUpdates(result);
+        await simulateFlowUpdates(enrichedResult);
         
-        return result;
+        return enrichedResult;
       }
       
-      // En modo real, elegir entre simple y orchestrator
+      // En modo real, determinar el tipo de ejecución
       console.log('🌐 Using real API mode');
       
-      if (config.executionType === 'orchestrator') {
+      let executionRequest: ExecutionRequest;
+      
+      // Construir request basado en el tipo de flujo
+      if (config.selectedFlowId === 'simple' || config.executionType === 'simple') {
+        console.log('⚡ Using simple LLM mode');
+        
+        executionRequest = {
+          prompt: params.prompt,
+          model: fullParams.modelKey,
+          execution_type: 'simple',
+          strategy: fullParams.strategy as 'standard' | 'optimized' | 'streaming' | undefined,
+          temperature: fullParams.temperature,
+          max_tokens: fullParams.maxTokens,
+        };
+      } 
+      else if (config.selectedFlowId === 'challenge') {
+        console.log('🔄 Using challenge flow mode');
+        
+        executionRequest = {
+          prompt: params.prompt,
+          model: fullParams.modelKey,
+          execution_type: 'challenge',
+          flow_type: 'challenge', // Agregar tipo de flujo específico
+          strategy: fullParams.strategy as 'standard' | 'optimized' | 'streaming' | undefined,
+          temperature: fullParams.temperature,
+          max_tokens: fullParams.maxTokens,
+          // Para challenge flow, no necesitamos agents/tools
+        };
+      }
+      else if (config.executionType === 'orchestrator') {
         console.log('🤖 Using orchestrator mode');
         
-        const executionRequest: ExecutionRequest = {
+        executionRequest = {
           prompt: params.prompt,
           model: fullParams.modelKey,
           execution_type: 'orchestrator',
+          flow_type: config.selectedFlowId || 'linear', // Especificar tipo de flujo
           strategy: fullParams.strategy as 'standard' | 'optimized' | 'streaming' | undefined,
           temperature: fullParams.temperature,
           max_tokens: fullParams.maxTokens,
@@ -133,16 +178,12 @@ export function useExecution() {
           enable_history: config.orchestrator.enable_history,
           retry_on_error: config.orchestrator.retry_on_error,
         };
+      } 
+      else {
+        // Fallback a simple
+        console.log('⚠️ Unknown execution type, falling back to simple');
         
-        console.log('🔧 Orchestrator request:', executionRequest);
-        const result = await api.executeWithType(executionRequest);
-        console.log('✅ Orchestrator response:', result);
-        
-        return result;
-      } else {
-        console.log('⚡ Using simple LLM mode');
-        
-        const executionRequest: ExecutionRequest = {
+        executionRequest = {
           prompt: params.prompt,
           model: fullParams.modelKey,
           execution_type: 'simple',
@@ -150,12 +191,42 @@ export function useExecution() {
           temperature: fullParams.temperature,
           max_tokens: fullParams.maxTokens,
         };
-        
-        console.log('🔧 Simple request:', executionRequest);
+      }
+      
+      console.log('🔧 Execution request:', executionRequest);
+      
+      try {
         const result = await api.executeWithType(executionRequest);
-        console.log('✅ Simple response:', result);
+        console.log('✅ Response received:', result);
         
-        return result;
+        // Enriquecer el resultado con la definición del flujo si existe
+        const enrichedResult = selectedFlow 
+          ? FlowAdapter.enrichExecutionResult(result, selectedFlow)
+          : result;
+        
+        // Si es challenge flow, extraer outputs específicos
+        if (config.selectedFlowId === 'challenge' && (result as any).challenge_flow) {
+          console.log('📦 Processing challenge flow outputs');
+          
+          const challengeOutputs = (result as any).challenge_flow;
+          const nodeOutputs: Record<string, string> = {};
+          
+          // Extraer outputs de cada nodo del challenge flow
+          Object.entries(challengeOutputs).forEach(([nodeId, nodeData]: [string, any]) => {
+            nodeOutputs[nodeId] = nodeData.output || '';
+          });
+          
+          // Agregar los outputs extraídos al resultado enriquecido
+          (enrichedResult as any).nodeOutputs = nodeOutputs;
+          (enrichedResult as any).challengeFlow = challengeOutputs;
+        }
+        
+        console.log('📊 Enriched result:', enrichedResult);
+        return enrichedResult;
+        
+      } catch (error) {
+        console.error('❌ Execution error:', error);
+        throw error;
       }
     },
     onSuccess: (data) => {
@@ -165,16 +236,63 @@ export function useExecution() {
     },
     onError: (error) => {
       console.error('❌ Execution failed:', error);
+      // Aquí podrías agregar notificaciones de error o manejo específico
     },
     onSettled: () => {
       setIsExecuting(false);
     },
   });
 
+  // Función auxiliar para detectar el tipo de flujo desde el resultado
+  const detectFlowType = useCallback((result: ExecutionResult): string => {
+    // Detectar por la estructura de los nodos
+    if (result.flow.nodes.some(n => n.type === 'creator')) {
+      return 'challenge';
+    }
+    if (result.flow.nodes.some(n => n.type === 'task_analyzer')) {
+      return 'linear';
+    }
+    return 'simple';
+  }, []);
+
+  // Función para obtener outputs por nodo
+  const getNodeOutputs = useCallback((execution: ExecutionResult | null): Record<string, string> => {
+    if (!execution) return {};
+    
+    const outputs: Record<string, string> = {};
+    
+    // Extraer de nodeOutputs si existe (agregado por FlowAdapter)
+    if ((execution as any).nodeOutputs) {
+      return (execution as any).nodeOutputs;
+    }
+    
+    // Extraer de challenge_flow si existe
+    if ((execution as any).challengeFlow) {
+      Object.entries((execution as any).challengeFlow).forEach(([nodeId, data]: [string, any]) => {
+        outputs[nodeId] = data.output || '';
+      });
+      return outputs;
+    }
+    
+    // Extraer de los nodos del flow
+    execution.flow.nodes.forEach(node => {
+      if (node.data?.output) {
+        outputs[node.id] = node.data.output;
+      }
+    });
+    
+    return outputs;
+  }, []);
+
   return {
     execute: executeMutation.mutate,
+    executeAsync: executeMutation.mutateAsync,
     isExecuting,
+    isLoading: executeMutation.isPending,
     currentExecution,
     error: executeMutation.error,
+    detectFlowType,
+    getNodeOutputs,
+    reset: executeMutation.reset,
   };
 }
