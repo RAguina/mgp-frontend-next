@@ -58,6 +58,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data }) => {
     completed: <CheckCircle className="w-4 h-4" />,
     failed: <XCircle className="w-4 h-4" />,
     skipped: <AlertCircle className="w-4 h-4" />,
+    error: <XCircle className="w-4 h-4" />,
   };
 
   return (

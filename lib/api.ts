@@ -261,7 +261,7 @@ class ApiClient {
         id: node.id,
         type: node.type,
         label: node.name,
-        status: node.status,
+        status: node.status === 'error' ? 'failed' : node.status,
         data: {
           output: node.output,
           error: node.error,

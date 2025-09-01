@@ -17,7 +17,7 @@ export interface NodeState {
     | 'error'            // Nuevo: para nodos de error
     | string;            // Flexible para tipos del backend
   label: string;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'error';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
   data?: {
     model?: string;
     strategy?: string;
