@@ -16,11 +16,11 @@ export const useLiveStream = (sessionId: string) => {
         connect();
         break;
       case 'token':
-        addToken(event.data);
+        addToken((event.data as { token: string }).token);
         break;
       case 'retry':
       case 'error':
-        setError(event.data.message);
+        setError((event.data as { message: string }).message);
         break;
       case 'done':
         disconnect();

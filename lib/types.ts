@@ -112,7 +112,7 @@ export interface ExecutionMetrics {
   cacheHit?: boolean;      // Nuevo: si fue cache hit
   loadTime?: number;       // Nuevo: tiempo de carga del modelo
   inferenceTime?: number;  // Nuevo: tiempo de inferencia
-  gpuInfo?: any;          // Nuevo: información de GPU
+  gpuInfo?: Record<string, unknown>;          // Nuevo: información de GPU
 }
 
 /**
@@ -144,7 +144,7 @@ export interface ExecutionPayload {
  */
 export interface WebSocketEvent {
   type: 'start' | 'token' | 'retry' | 'error' | 'done';
-  data: any;
+  data: Record<string, unknown>;
   session_id: string;
   timestamp: number;
 }
@@ -174,7 +174,7 @@ export interface CacheInfo {
   memory_stats: {
     cache_size: number;
     loaded_models: [string, string][];
-    gpu_info: any;
+    gpu_info: Record<string, unknown>;
     memory_pressure: boolean;
     max_vram_limit_gb: number;
   };
@@ -244,7 +244,7 @@ export interface ExecutionResponse {
     cache_hit?: boolean;
     load_time_sec?: number;
     inference_time_sec?: number;
-    gpu_info?: any;
+    gpu_info?: Record<string, unknown>;
   };
   success: boolean;
 }
@@ -326,4 +326,89 @@ export interface ExecutionRequest {
 
   // ✅ NUEVO: Campo para especificar el tipo de flujo
   flow_type?: string; // 'linear' | 'challenge' | 'research' | etc.
+
+  // 🆕 NUEVOS CAMPOS RAG (todos opcionales)
+  embedding_model?: string;      // "bge-m3", "e5-large", "openai-embed"
+  vector_store?: string;         // "milvus", "weaviate", "pinecone"
+  rag_config?: {                 // Configuración específica
+    top_k?: number;              // Número de documentos a recuperar
+    threshold?: number;          // Umbral de similitud
+    chunk_size?: number;         // Tamaño de chunks
+    [key: string]: unknown;          // Extensible
+  };
+}
+
+// 🆕 NUEVOS TIPOS PARA RAG WORKSPACE (se agregan sin modificar nada existente)
+
+export interface RagDocument {
+  id: string;
+  filename: string;
+  type: 'pdf' | 'md' | 'txt' | 'image' | 'docx';
+  size: number;
+  uploaded_at: string;
+  status: 'uploading' | 'uploaded' | 'processing' | 'processed' | 'error';
+}
+
+export interface RagProcessingConfig {
+  chunk_size: number;
+  chunk_overlap: number;
+  embedding_model: string;
+  vector_store: string;
+  quality_filters: {
+    min_chunk_length: number;
+    remove_duplicates: boolean;
+    language_filter?: string;
+    quality_threshold?: number;
+  };
+}
+
+export interface RagMetrics {
+  total_chunks: number;
+  duplicates_removed: number;
+  avg_quality_score: number;
+  processing_time_ms: number;
+  storage_size_mb: number;
+  index_size: number;
+}
+
+export interface RagArtifact {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+  status: 'creating' | 'processing' | 'ready' | 'error';
+  
+  documents: RagDocument[];
+  processing_config: RagProcessingConfig;
+  metrics?: RagMetrics;
+  error_message?: string;
+}
+
+export interface RagProcessingStep {
+  id: string;
+  name: string;
+  status: 'pending' | 'running' | 'completed' | 'error';
+  progress?: number;
+  message?: string;
+  started_at?: string;
+  completed_at?: string;
+}
+
+export interface RagProcessingPipeline {
+  rag_id: string;
+  steps: RagProcessingStep[];
+  overall_status: 'pending' | 'running' | 'completed' | 'error';
+  started_at?: string;
+  completed_at?: string;
+}
+
+export interface RagUsageConfig {
+  rag_id: string;
+  retrieval_config: {
+    top_k: number;
+    threshold: number;
+    rerank?: boolean;
+    hybrid_search?: boolean;
+  };
 }

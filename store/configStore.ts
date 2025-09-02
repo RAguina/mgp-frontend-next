@@ -26,6 +26,18 @@ interface ConfigStore {
     retry_on_error: boolean;
   };
   
+  // 🆕 NUEVO: Configuración RAG
+  rag: {
+    enabled: boolean;
+    embedding_model: string;
+    vector_store: string;
+    config: {
+      top_k: number;
+      threshold: number;
+      chunk_size: number;
+    };
+  };
+  
   // Actions existentes
   setDefaultModel: (model: string) => void;
   setDefaultStrategy: (strategy: string) => void;
@@ -43,6 +55,12 @@ interface ConfigStore {
   setOrchestratorVerbose: (verbose: boolean) => void;
   setOrchestratorHistory: (enable: boolean) => void;
   setOrchestratorRetry: (retry: boolean) => void;
+
+  // 🆕 NUEVO: Actions para RAG
+  setRagEnabled: (enabled: boolean) => void;
+  setRagEmbeddingModel: (model: string) => void;
+  setRagVectorStore: (store: string) => void;
+  setRagConfig: (config: { top_k?: number; threshold?: number; chunk_size?: number }) => void;
 }
 
 export const useConfigStore = create<ConfigStore>()(
@@ -66,6 +84,18 @@ export const useConfigStore = create<ConfigStore>()(
         verbose: false,
         enable_history: true,
         retry_on_error: true,
+      },
+      
+      // 🆕 NUEVO: Estado inicial para RAG
+      rag: {
+        enabled: false,
+        embedding_model: 'bge-m3',
+        vector_store: 'milvus',
+        config: {
+          top_k: 5,
+          threshold: 0.7,
+          chunk_size: 512,
+        },
       },
       
       // Actions existentes
@@ -99,6 +129,27 @@ export const useConfigStore = create<ConfigStore>()(
       setOrchestratorRetry: (retry_on_error) => 
         set((state) => ({ 
           orchestrator: { ...state.orchestrator, retry_on_error } 
+        })),
+
+      // 🆕 NUEVO: Actions para RAG
+      setRagEnabled: (enabled) => 
+        set((state) => ({ 
+          rag: { ...state.rag, enabled } 
+        })),
+      setRagEmbeddingModel: (embedding_model) => 
+        set((state) => ({ 
+          rag: { ...state.rag, embedding_model } 
+        })),
+      setRagVectorStore: (vector_store) => 
+        set((state) => ({ 
+          rag: { ...state.rag, vector_store } 
+        })),
+      setRagConfig: (config) => 
+        set((state) => ({ 
+          rag: { 
+            ...state.rag, 
+            config: { ...state.rag.config, ...config } 
+          } 
         })),
     }),
     {

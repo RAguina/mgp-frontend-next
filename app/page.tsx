@@ -8,15 +8,15 @@ import { FlowVisualizer } from '@/components/flow/FlowVisualizer';
 import { NodeDetailPanel } from '@/components/flow/NodeDetailPanel';
 import ExecutionTypeSelector from '@/components/console/ExecutionTypeSelector';
 import ModelSelector from '@/components/console/ModelSelector';
+import RAGWorkspace from '@/components/rag/RAGWorkspace';
 import { PromptConsole } from '@/components/console/PromptConsole';
 import { MetricsPanel } from '@/components/panels/MetricsPanel';
 import { OutputDisplay } from '@/components/output/OutputDisplay';
-import { ExportButton } from '@/components/ui/ExportButton';
 import { useExecution } from '@/hooks/useExecution';
 import { useSystemMetrics } from '@/hooks/useSystemMetrics';
 import { NodeState } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Brain, Activity, Code } from 'lucide-react';
+import { Brain, Activity } from 'lucide-react';
 
 /**
  * Página principal de la aplicación
@@ -72,11 +72,9 @@ export default function Home() {
           {/* Columna Izquierda */}
           <div className="col-span-4 space-y-6">
             <PromptConsole onSubmit={handlePromptSubmit} isLoading={isExecuting} />
-            {/* TODO: ModelSelector */}
-            <div className="bg-white rounded-lg shadow p-4 text-gray-500 italic text-sm">
-              <ModelSelector />
-              <ExecutionTypeSelector />
-            </div>
+            <ModelSelector />
+            <ExecutionTypeSelector />
+            <RAGWorkspace />
             <MetricsPanel execution={currentExecution} systemMetrics={metrics} />
           </div>
 

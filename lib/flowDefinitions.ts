@@ -1,6 +1,6 @@
 // lib/flowDefinitions.ts - NUEVO archivo
 
-import { NodeState, EdgeState, FlowState } from './types';
+// Types are used indirectly in the interface definitions
 
 /**
  * Definición de un flujo configurable
@@ -19,7 +19,7 @@ export interface FlowDefinition {
     // Nodo principal para mostrar
     primaryNode?: string;
     // Cómo extraer outputs de cada nodo
-    nodeOutputExtractor?: (node: any) => string;
+    nodeOutputExtractor?: (node: Record<string, unknown>) => string;
   };
   
   // Configuración de visualización
@@ -37,6 +37,6 @@ export interface FlowDefinition {
   // Configuración para el request
   requestConfig?: {
     execution_type?: string; // "challenge", "research", etc.
-    additional_params?: Record<string, any>;
+    additional_params?: Record<string, unknown>;
   };
 }

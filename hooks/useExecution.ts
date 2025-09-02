@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { create } from 'zustand';
 import { api } from '@/lib/api';
-import { GenerationParams, ExecutionResult, FlowState, NodeState, ExecutionRequest } from '@/lib/types';
+import { GenerationParams, ExecutionResult, FlowState, NodeState, ExecutionRequest, RagUsageConfig } from '@/lib/types';
 import { useConfigStore } from '@/store/configStore';
 import { flowRegistry } from '@/lib/flowRegistry';
 import { FlowAdapter } from '@/lib/flowAdapter';
@@ -134,6 +134,17 @@ export function useExecution() {
       
       let executionRequest: ExecutionRequest;
       
+      // Función helper para construir RAG fields
+      const buildRagFields = () => {
+        if (!config.rag.enabled) return {};
+        
+        return {
+          embedding_model: config.rag.embedding_model,
+          vector_store: config.rag.vector_store,
+          rag_config: config.rag.config,
+        };
+      };
+
       // Construir request basado en el tipo de flujo
       if (config.selectedFlowId === 'simple' || config.executionType === 'simple') {
         console.log('⚡ Using simple LLM mode');
@@ -145,6 +156,7 @@ export function useExecution() {
           strategy: fullParams.strategy as 'standard' | 'optimized' | 'streaming' | undefined,
           temperature: fullParams.temperature,
           max_tokens: fullParams.maxTokens,
+          ...buildRagFields(), // 🆕 Agregar campos RAG si están habilitados
         };
       } 
       else if (config.selectedFlowId === 'challenge') {
@@ -158,6 +170,7 @@ export function useExecution() {
           strategy: fullParams.strategy as 'standard' | 'optimized' | 'streaming' | undefined,
           temperature: fullParams.temperature,
           max_tokens: fullParams.maxTokens,
+          ...buildRagFields(), // 🆕 Agregar campos RAG si están habilitados
           // Para challenge flow, no necesitamos agents/tools
         };
       }
@@ -177,6 +190,7 @@ export function useExecution() {
           verbose: config.orchestrator.verbose,
           enable_history: config.orchestrator.enable_history,
           retry_on_error: config.orchestrator.retry_on_error,
+          ...buildRagFields(), // 🆕 Agregar campos RAG si están habilitados
         };
       } 
       else {
@@ -190,10 +204,19 @@ export function useExecution() {
           strategy: fullParams.strategy as 'standard' | 'optimized' | 'streaming' | undefined,
           temperature: fullParams.temperature,
           max_tokens: fullParams.maxTokens,
+          ...buildRagFields(), // 🆕 Agregar campos RAG si están habilitados
         };
       }
       
       console.log('🔧 Execution request:', executionRequest);
+      
+      // 🆕 NUEVO: Log RAG configuration if enabled
+      if (config.rag.enabled) {
+        console.log('🧠 RAG Configuration:');
+        console.log('  Embedding Model:', config.rag.embedding_model);
+        console.log('  Vector Store:', config.rag.vector_store);
+        console.log('  RAG Config:', config.rag.config);
+      }
       
       try {
         const result = await api.executeWithType(executionRequest);

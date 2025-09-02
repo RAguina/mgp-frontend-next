@@ -8,7 +8,6 @@ import type {
   ModelConfig, 
   FlowState, 
   ExecutionPayload, 
-  WebSocketEvent,
   ExecutionRequest
 } from './types';
 
@@ -51,7 +50,7 @@ interface BackendExecutionResponse {
     cache_hit?: boolean;
     load_time_sec?: number;
     inference_time_sec?: number;
-    gpu_info?: any;
+    gpu_info?: Record<string, unknown>;
   };
   success: boolean;
 }
@@ -100,7 +99,7 @@ class ApiClient {
 
     try {
       // Llamar al endpoint del backend que llama al lab
-      const response = await axios.get(`${this.baseURL}/api/v1/models`);
+      await axios.get(`${this.baseURL}/api/v1/models`);
       
       // Si el backend no tiene endpoint de modelos, llamar directamente al lab
       const labResponse = await axios.get('http://localhost:8001/models/');
@@ -147,7 +146,7 @@ class ApiClient {
       }
 
       // Obtener cache info del lab
-      let cacheData: any = {};
+      let cacheData: Record<string, unknown> = {};
       try {
         const cacheResponse = await axios.get('http://localhost:8001/cache/');
         cacheData = cacheResponse.data;
@@ -231,7 +230,7 @@ class ApiClient {
   /**
    * Obtiene el estado del cache
    */
-  async getCacheStatus(): Promise<any> {
+  async getCacheStatus(): Promise<Record<string, unknown>> {
     try {
       const response = await axios.get('http://localhost:8001/cache/');
       return response.data;
@@ -370,7 +369,7 @@ class ApiClient {
     return response;
   }
 
-  async getHistory(userId?: string): Promise<ExecutionResult[]> {
+  async getHistory(): Promise<ExecutionResult[]> {
     // TODO: Implementar cuando el backend tenga historial
     return [];
   }

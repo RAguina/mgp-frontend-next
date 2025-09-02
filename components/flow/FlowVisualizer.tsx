@@ -126,14 +126,14 @@ export const FlowVisualizer: React.FC<FlowVisualizerProps> = ({
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [, setSelectedNode] = useState<string | null>(null);
 
   /**
    * Convierte el estado del flujo a nodos de ReactFlow
    */
   const convertToReactFlowNodes = useCallback((nodeStates: NodeState[]): Node[] => {
-    const nodeWidth = 200;
-    const nodeHeight = 100;
+    // const nodeWidth = 200;
+    // const nodeHeight = 100;
     const horizontalSpacing = 250;
     const verticalSpacing = 150;
 

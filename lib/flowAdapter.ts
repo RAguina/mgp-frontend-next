@@ -1,6 +1,6 @@
 // lib/flowAdapter.ts - NUEVO
 
-import { ExecutionResult, FlowState, NodeState } from './types';
+import { ExecutionResult, NodeState } from './types';
 import { FlowDefinition } from './flowDefinitions';
 
 export class FlowAdapter {
@@ -17,9 +17,9 @@ export class FlowAdapter {
     const nodeOutputs: Record<string, string> = {};
     
     // Si hay challenge_flow en la respuesta
-    if ((result as any).challenge_flow) {
-      Object.entries((result as any).challenge_flow).forEach(([nodeId, data]: [string, any]) => {
-        nodeOutputs[nodeId] = data.output || '';
+    if ((result as unknown as Record<string, unknown>).challenge_flow) {
+      Object.entries((result as unknown as Record<string, unknown>).challenge_flow as Record<string, unknown>).forEach(([nodeId, data]: [string, unknown]) => {
+        nodeOutputs[nodeId] = (data as Record<string, unknown>).output as string || '';
       });
     }
     
